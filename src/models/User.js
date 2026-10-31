@@ -15,6 +15,7 @@ const UserSchema = new mongoose.Schema(
     // Team-account fields (managed by the Design Head).
     employeeId: { type: String, default: '' },
     username: { type: String, default: '' },
+    designation: { type: String, default: '' }, // job title, e.g. Structural Design Engineer
 
     // For a Design Team user, the designer roster record they act as (optional).
     designerId: { type: String, default: '' },

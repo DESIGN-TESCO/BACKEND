@@ -55,7 +55,7 @@ const changePassword = asyncHandler(async (req, res) => {
 
 // POST /api/auth/users  (Design Head only) — create a Design Team login account.
 const createUser = asyncHandler(async (req, res) => {
-  const { name, email, username, password, role, employeeId, designerId, isActive } = req.body || {};
+  const { name, email, username, password, role, employeeId, designation, designerId, isActive } = req.body || {};
   if (!name || !password) throw new ApiError(400, 'Name and password are required.');
   if (!email && !username) throw new ApiError(400, 'An email or username is required.');
   const useRole = role === 'design_head' ? 'design_head' : 'design_team';
@@ -64,7 +64,7 @@ const createUser = asyncHandler(async (req, res) => {
   if (username && await User.findOne({ username })) throw new ApiError(409, 'A user with that username already exists.');
   const user = new User({
     name, email: emailNorm, username: username || '', role: useRole,
-    employeeId: employeeId || '', designerId: designerId || '',
+    employeeId: employeeId || '', designation: designation || '', designerId: designerId || '',
     isActive: isActive === false ? false : true,
   });
   await user.setPassword(password);
@@ -82,11 +82,12 @@ const listUsers = asyncHandler(async (req, res) => {
 const updateUser = asyncHandler(async (req, res) => {
   const user = await User.findById(req.params.id);
   if (!user) throw new ApiError(404, 'User not found.');
-  const { name, email, username, employeeId, designerId, role, isActive } = req.body || {};
+  const { name, email, username, employeeId, designation, designerId, role, isActive } = req.body || {};
   if (name != null) user.name = name;
   if (email != null) user.email = String(email).toLowerCase().trim();
   if (username != null) user.username = username;
   if (employeeId != null) user.employeeId = employeeId;
+  if (designation != null) user.designation = designation;
   if (designerId != null) user.designerId = designerId;
   if (role && ['design_head', 'design_team'].includes(role)) user.role = role;
   if (isActive != null) user.isActive = !!isActive;
@@ -114,4 +115,13 @@ const setUserActive = asyncHandler(async (req, res) => {
   res.json({ success: true, user: user.toSafeJSON() });
 });
 
-module.exports = { login, me, updateMe, changePassword, createUser, listUsers, updateUser, resetUserPassword, setUserActive };
+// DELETE /api/auth/users/:id  (Design Head only)
+const deleteUser = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.params.id);
+  if (!user) throw new ApiError(404, 'User not found.');
+  if (String(user._id) === String(req.auth && req.auth.id)) throw new ApiError(400, 'You cannot delete your own account.');
+  await User.deleteOne({ _id: req.params.id });
+  res.json({ success: true });
+});
+
+module.exports = { login, me, updateMe, changePassword, createUser, listUsers, updateUser, resetUserPassword, setUserActive, deleteUser };
