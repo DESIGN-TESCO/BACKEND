@@ -32,6 +32,9 @@ const RequestSchema = new mongoose.Schema(
     salesManager: { type: String, default: '' },
     projectManager: { type: String, default: '' },
     assignedDesigner: { type: String, default: 'Unassigned' }, // designer NAME or 'Unassigned'
+    assignedUserId: { type: String, default: '' },      // design_users _id of the assigned member (authoritative)
+    assignedEmployeeId: { type: String, default: '' },  // employee id snapshot
+    assignedDate: { type: String, default: '' },        // when assigned (YYYY-MM-DD)
     dueDate: { type: String, default: '' },             // YYYY-MM-DD
     status: { type: String, default: 'New' },           // New|Assigned|In Progress|Pending Review|Completed|Approved|Revision…
     budget: { type: String, default: '' },
@@ -59,6 +62,12 @@ const RequestSchema = new mongoose.Schema(
     approvedFiles: { type: [AttachmentSchema], default: [] }, // {name,size,type,fileId}
     rejectionReason: { type: String, default: '' },
     changeRemarks: { type: String, default: '' },
+
+    // ── Review feedback history (never overwritten) ──
+    feedback: { type: [mongoose.Schema.Types.Mixed], default: [] }, // {by, role, action, text, time}
+    submittedBy: { type: String, default: '' },   // last submitter (team member name)
+    submittedAt: { type: String, default: '' },   // last submission time
+    submissionCount: { type: Number, default: 0 },
   },
   { timestamps: true, strict: false, collection: 'design_requests' }
 );

@@ -29,7 +29,7 @@ const create = asyncHandler(async (req, res) => {
   if (body.reqId) {
     const reqDoc = await Request.findOne({ id: body.reqId });
     if (reqDoc) {
-      reqDoc.status = 'Pending Review';
+      if (!body.silent) reqDoc.status = 'Pending Review';
       reqDoc.attachments = reqDoc.attachments || [];
       reqDoc.attachments.unshift({ name: body.fileName || 'deliverable', size: body.fileSize || '', type: body.fileType || '', fileId: body.fileId || '' });
       reqDoc.history = reqDoc.history || [];
@@ -37,7 +37,7 @@ const create = asyncHandler(async (req, res) => {
       await reqDoc.save();
     }
   }
-  await Notification.create({ audience: 'head', category: 'Reviews', title: 'New submittal for review', message: `${body.projectName || body.reqId} — ${body.fileName || ''}`, time: 'just now' });
+  if (!body.silent) await Notification.create({ audience: 'head', category: 'Reviews', title: 'New submittal for review', message: `${body.projectName || body.reqId} \u2014 ${body.fileName || ''}`, time: 'just now', requestId: body.reqId || '' });
   res.status(201).json(doc.toObject());
 });
 

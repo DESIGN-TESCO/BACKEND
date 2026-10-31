@@ -4,14 +4,17 @@ const { protect, restrictTo } = require('../middleware/auth');
 
 router.use(protect);
 router.get('/', c.list);
+router.get('/mine', c.mine); // assigned to the logged-in team member (before /:id)
 router.post('/', c.create);
 router.get('/:id', c.getOne);
+router.get('/:id/project', c.getProject); // live Procurement project details
 router.put('/:id', c.update);
 router.delete('/:id', restrictTo('design_head'), c.remove);
 
 router.post('/:id/assign', restrictTo('design_head'), c.assign);
 router.put('/:id/designer', restrictTo('design_head'), c.directAssign);
 router.put('/:id/status', c.setStatus);
+router.post('/:id/submit', c.submitForApproval); // team submit / resubmit for approval
 router.post('/:id/comments', c.addComment);
 router.put('/:id/requirement', c.saveRequirement);
 router.post('/:id/attachments', c.addAttachment);

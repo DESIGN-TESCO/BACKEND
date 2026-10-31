@@ -15,6 +15,9 @@ const NotificationSchema = new mongoose.Schema(
     read: { type: Boolean, default: false },
     time: { type: String, default: '' },
     designerName: { type: String, default: '' }, // optional: target team member
+    requestId: { type: String, default: '' },    // link to a design request (click-to-open)
+    projectName: { type: String, default: '' },  // snapshot for display
+    projectCode: { type: String, default: '' },  // procurement project code
   },
   { timestamps: true, collection: 'design_notifications' }
 );
