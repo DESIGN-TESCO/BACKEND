@@ -1,41 +1,37 @@
-// Creates (or reactivates) a TEMPORARY dummy Design Head account so you can sign in,
-// then delete it from Team Accounts afterwards. Runs against the same database your
-// backend uses (reads MONGO_URI from .env). Run once with:  npm run seed:dummy
+// Creates (or reactivates + resets) temporary test accounts so you can sign in,
+// then delete them from Team Accounts afterwards. Runs against the same database
+// your backend uses (reads MONGO_URI from .env). Run with:  npm run seed:dummy
 require('dotenv').config();
 const mongoose = require('mongoose');
 const connectDB = require('../config/db');
 const User = require('../models/User');
 
-const DUMMY = {
-  name: 'Dummy Head',
-  email: 'dummyhead@tesco.local',
-  password: 'Dummy@12345',
-  role: 'design_head',
-};
+// Edit this list to seed whatever test logins you need.
+const ACCOUNTS = [
+  { name: 'Karthick M', email: 'karthick@tescostructures.in', password: 'Karthick@123', role: 'design_head' },
+  { name: 'Dummy Head', email: 'dummyhead@tesco.local',       password: 'Dummy@12345',  role: 'design_head' },
+];
 
 (async () => {
   try {
     await connectDB();
-    let u = await User.findOne({ email: DUMMY.email.toLowerCase() });
-    if (u) {
-      u.isActive = true;                 // reactivate if it was disabled
-      u.role = DUMMY.role;
-      await u.setPassword(DUMMY.password);
-      await u.save();
-      console.log(`[seed:dummy] reactivated & reset existing account: ${DUMMY.email}`);
-    } else {
-      u = new User({ name: DUMMY.name, email: DUMMY.email.toLowerCase(), role: DUMMY.role, isActive: true });
-      await u.setPassword(DUMMY.password);
-      await u.save();
-      console.log(`[seed:dummy] created account: ${DUMMY.email}`);
+    for (const a of ACCOUNTS) {
+      const email = a.email.toLowerCase();
+      let u = await User.findOne({ email });
+      if (u) {
+        u.isActive = true; u.role = a.role; u.name = a.name;
+        await u.setPassword(a.password);
+        await u.save();
+        console.log(`[seed:dummy] reactivated & reset: ${email}`);
+      } else {
+        u = new User({ name: a.name, email, role: a.role, isActive: true });
+        await u.setPassword(a.password);
+        await u.save();
+        console.log(`[seed:dummy] created: ${email}`);
+      }
+      console.log(`   -> Email: ${a.email}  |  Password: ${a.password}  |  Role: ${a.role === 'design_head' ? 'Design Head' : 'Design Team'}`);
     }
-    console.log('--------------------------------------------------');
-    console.log('  Login at the Design portal with:');
-    console.log(`  Email    : ${DUMMY.email}`);
-    console.log(`  Password : ${DUMMY.password}`);
-    console.log('  Role     : Design Head');
-    console.log('  (Delete this account from Team Accounts when done.)');
-    console.log('--------------------------------------------------');
+    console.log('Delete these test accounts from Team Accounts when you are done.');
     await mongoose.disconnect();
     process.exit(0);
   } catch (err) {
