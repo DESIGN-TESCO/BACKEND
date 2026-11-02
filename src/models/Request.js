@@ -52,6 +52,7 @@ const RequestSchema = new mongoose.Schema(
 
     // ── Procurement ⇄ Design integration (shared database) ──
     source: { type: String, default: 'manual' },        // 'procurement' | 'manual'
+    requestFrom: { type: String, default: '' },          // category: 'Sales Team' | 'Project Team'
     procurementProjectId: { type: String, default: '' }, // Procurement PRJ-xxx
     procurementProjectCode: { type: String, default: '' },
     requestedByUser: { type: String, default: '' },      // procurement user name/email
