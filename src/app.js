@@ -12,10 +12,10 @@ app.use(cors({
   credentials: true,
 }));
 
-// Body parsing — generous limit so base64 file uploads (≤12 MB file ≈ 16 MB
+// Body parsing — generous limit so base64 file uploads (≤100 MB file ≈ 135 MB
 // encoded) fit comfortably.
-app.use(express.json({ limit: '90mb' }));
-app.use(express.urlencoded({ limit: '90mb', extended: true }));
+app.use(express.json({ limit: '160mb' }));
+app.use(express.urlencoded({ limit: '160mb', extended: true }));
 
 // Health check.
 app.get('/api/health', (req, res) => res.json({ status: 'ok', service: 'design-crm', time: new Date().toISOString() }));
