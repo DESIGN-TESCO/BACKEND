@@ -94,4 +94,41 @@ const remove = asyncHandler(async (req, res) => {
   res.json({ success: true });
 });
 
-module.exports = { upload, listByEntity, stream, remove };
+// POST /api/files/stream?entity=&entityId=&name=&type=&uploadedBy=
+// The raw file bytes ARE the request body (no base64, no JSON wrapper). They are piped
+// straight into GridFS, so even very large files never load fully into memory and the
+// JSON body-size limit does not apply. This is the memory-safe path for big uploads.
+const uploadStream = asyncHandler(async (req, res) => {
+  const q = req.query || {};
+  const name = (q.name ? decodeURIComponent(String(q.name)) : '') || 'file';
+  const type = String(q.type || req.headers['content-type'] || 'application/octet-stream');
+  const max = maxBytes();
+  const declared = Number(req.headers['content-length'] || 0);
+  if (declared && declared > max) throw new ApiError(413, `That file is larger than ${process.env.MAX_UPLOAD_MB || 60} MB.`);
+
+  const bucket = getBucket();
+  const up = bucket.openUploadStream(name, {
+    contentType: type,
+    metadata: { entity: String(q.entity || ''), entityId: String(q.entityId || ''), uploadedBy: String(q.uploadedBy || (req.auth && req.auth.name) || '') },
+  });
+
+  let bytes = 0, tooBig = false;
+  try {
+    await new Promise((resolve, reject) => {
+      up.on('error', reject);
+      up.on('finish', resolve);
+      req.on('error', reject);
+      req.on('aborted', () => reject(new Error('aborted')));
+      req.on('data', (chunk) => { bytes += chunk.length; if (bytes > max && !tooBig) { tooBig = true; up.destroy(new Error('too-big')); } });
+      req.pipe(up);
+    });
+  } catch (e) {
+    try { await bucket.delete(up.id); } catch (_) { /* nothing written */ }
+    if (tooBig) throw new ApiError(413, `That file is larger than ${process.env.MAX_UPLOAD_MB || 60} MB.`);
+    throw new ApiError(400, 'Upload failed — the connection dropped before the file finished. Please try again.');
+  }
+  if (!bytes) { try { await bucket.delete(up.id); } catch (_) {} throw new ApiError(400, 'The file appears to be empty.'); }
+  res.status(201).json({ success: true, fileId: String(up.id), name, type, size: bytes });
+});
+
+module.exports = { upload, uploadStream, listByEntity, stream, remove };
