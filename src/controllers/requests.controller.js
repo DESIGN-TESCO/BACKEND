@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const Request = require('../models/Request');
 const Designer = require('../models/Designer');
 const Submittal = require('../models/Submittal');
@@ -305,4 +306,66 @@ const mine = asyncHandler(async (req, res) => {
   res.json(docs);
 });
 
-module.exports = { ...base, assign, getProject, submitForApproval, mine, directAssign, setStatus, addComment, saveRequirement, addAttachment, approve, reject, requestChanges };
+// PUT /api/requests/:id/edit  (Design Head only) — edit an existing request in place.
+// Updates editable fields, links newly uploaded attachments, removes only the files the
+// Head explicitly removed, and records a dated history entry. Never changes the
+// assignment, status, approval or rejection of the request.
+const EDITABLE_FIELDS = ['requestFrom', 'customerName', 'projectName', 'projectType', 'requirement', 'service', 'priority', 'requestedBy', 'leadId', 'dueDate', 'location', 'budget', 'timeline', 'description', 'instructions'];
+const editRequest = asyncHandler(async (req, res) => {
+  const reqDoc = await Request.findOne({ id: req.params.id });
+  if (!reqDoc) throw new ApiError(404, 'Request not found.');
+  const body = req.body || {};
+
+  const changed = [];
+  for (const k of EDITABLE_FIELDS) {
+    if (Object.prototype.hasOwnProperty.call(body, k) && body[k] !== undefined) {
+      const val = typeof body[k] === 'string' ? body[k] : body[k];
+      if (String(reqDoc[k] == null ? '' : reqDoc[k]) !== String(val == null ? '' : val)) changed.push(k);
+      reqDoc[k] = val;
+    }
+  }
+
+  // Remove ONLY the attachments the Head explicitly removed (and their stored bytes).
+  const removeIds = Array.isArray(body.removeFileIds) ? body.removeFileIds.map(String) : [];
+  const removedNames = [];
+  if (removeIds.length) {
+    reqDoc.attachments = (reqDoc.attachments || []).filter((a) => {
+      if (a && a.fileId && removeIds.includes(String(a.fileId))) { removedNames.push(a.name || a.fileId); return false; }
+      return true;
+    });
+    try {
+      const bucket = new mongoose.mongo.GridFSBucket(mongoose.connection.db, { bucketName: 'design_uploads' });
+      for (const fid of removeIds) { try { await bucket.delete(new mongoose.Types.ObjectId(fid)); } catch (e) { /* already gone / legacy */ } }
+    } catch (e) { /* ignore bucket errors — metadata already removed */ }
+  }
+
+  // Link newly uploaded attachments (bytes are uploaded separately via /api/files).
+  const added = Array.isArray(body.addAttachments) ? body.addAttachments : [];
+  const addedNames = [];
+  if (added.length) {
+    reqDoc.attachments = reqDoc.attachments || [];
+    for (const a of added) {
+      if (!a || !a.name) continue;
+      reqDoc.attachments.push({ name: a.name, size: a.size || '', type: a.type || '', fileId: a.fileId || '' });
+      addedNames.push(a.name);
+    }
+  }
+  reqDoc.markModified('attachments');
+
+  const parts = [];
+  if (changed.length) parts.push(`Updated ${changed.join(', ')}`);
+  if (addedNames.length) parts.push(`Added ${addedNames.length} file(s): ${addedNames.join(', ')}`);
+  if (removedNames.length) parts.push(`Removed ${removedNames.length} file(s): ${removedNames.join(', ')}`);
+  const editor = (req.auth && req.auth.name) || 'Design Head';
+  pushHistory(reqDoc, 'Request edited by Design Head', parts.join(' · ') || 'No changes');
+  await reqDoc.save();
+  await logActivity(editor, 'edited request', reqDoc.id);
+
+  // Let the assigned team member know the request (and its attachments) changed.
+  if (reqDoc.assignedDesigner && reqDoc.assignedDesigner !== 'Unassigned' && (addedNames.length || removedNames.length || changed.length)) {
+    await Notification.create({ audience: 'team', type: 'update', title: 'Request updated', desc: `${reqDoc.projectName || reqDoc.id} updated by Design Head${addedNames.length ? ' · ' + addedNames.length + ' new file(s)' : ''}`, time: 'just now', designerName: reqDoc.assignedDesigner, requestId: reqDoc.id, projectName: reqDoc.projectName || '', projectCode: reqDoc.procurementProjectCode || '' });
+  }
+  res.json(reqDoc.toObject());
+});
+
+module.exports = { ...base, assign, getProject, submitForApproval, mine, directAssign, setStatus, addComment, saveRequirement, addAttachment, editRequest, approve, reject, requestChanges };

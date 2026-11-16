@@ -18,6 +18,7 @@ router.post('/:id/submit', c.submitForApproval); // team submit / resubmit for a
 router.post('/:id/comments', c.addComment);
 router.put('/:id/requirement', c.saveRequirement);
 router.post('/:id/attachments', c.addAttachment);
+router.put('/:id/edit', restrictTo('design_head'), c.editRequest); // Design Head edits a request in place
 
 // Design Head approval workflow.
 router.post('/:id/approve', restrictTo('design_head'), c.approve);
