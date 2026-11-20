@@ -13,6 +13,10 @@ const crud = require('./crudFactory');
 const { nextYearlyId, nextSeqId } = require('../utils/ids');
 const { adjustDesignerWorkload } = require('../utils/workload');
 
+// Portals that raise design requests and must be notified of the outcome (approve /
+// reject / changes). Each reads its own `design_notifications` (audience = source).
+const EXTERNAL_SOURCES = ['procurement', 'sales', 'execution'];
+
 const genId = (Model) => nextYearlyId(Model, 'id', 'REQ');
 const base = crud(Request, { genId });
 
@@ -167,7 +171,7 @@ const approve = asyncHandler(async (req, res) => {
   await reqDoc.save();
   await logActivity(reqDoc.approvedBy, 'approved design', reqDoc.id);
   await Notification.create({ audience: 'team', type: 'approval', title: 'Design approved', desc: `${reqDoc.projectName || reqDoc.id}${reqDoc.procurementProjectCode ? ' (' + reqDoc.procurementProjectCode + ')' : ''} approved${approveNote ? ' \u2014 ' + approveNote : ''}`, time: 'just now', designerName: reqDoc.assignedDesigner, requestId: reqDoc.id, projectName: reqDoc.projectName || '', projectCode: reqDoc.procurementProjectCode || '' });
-  if (reqDoc.source === 'procurement') await Notification.create({ audience: 'procurement', type: 'approval', title: 'Design approved', desc: `${reqDoc.projectName || reqDoc.id} (${reqDoc.procurementProjectCode || ''}) approved — files ready to download`, time: 'just now' });
+  if (EXTERNAL_SOURCES.includes(reqDoc.source)) await Notification.create({ audience: reqDoc.source, type: 'approval', title: 'Design approved', desc: `${reqDoc.projectName || reqDoc.id}${reqDoc.procurementProjectCode ? ' (' + reqDoc.procurementProjectCode + ')' : ''} approved — files ready to download`, time: 'just now', requestId: reqDoc.id, projectName: reqDoc.projectName || '', projectCode: reqDoc.procurementProjectCode || '' });
   res.json(reqDoc.toObject());
 });
 
@@ -184,7 +188,7 @@ const reject = asyncHandler(async (req, res) => {
   pushFeedback(reqDoc, reviewer, 'Design Head', 'Rejected', reason);
   await reqDoc.save();
   await Notification.create({ audience: 'team', type: 'revision', title: 'Design rejected', desc: `${reqDoc.projectName || reqDoc.id}: ${reason}`, time: 'just now', designerName: reqDoc.assignedDesigner, requestId: reqDoc.id, projectName: reqDoc.projectName || '', projectCode: reqDoc.procurementProjectCode || '' });
-  if (reqDoc.source === 'procurement') await Notification.create({ audience: 'procurement', type: 'revision', title: 'Design rejected', desc: `${reqDoc.projectName || reqDoc.id}: ${reason}`, time: 'just now' });
+  if (EXTERNAL_SOURCES.includes(reqDoc.source)) await Notification.create({ audience: reqDoc.source, type: 'revision', title: 'Design rejected', desc: `${reqDoc.projectName || reqDoc.id}: ${reason}`, time: 'just now', requestId: reqDoc.id, projectName: reqDoc.projectName || '', projectCode: reqDoc.procurementProjectCode || '' });
   res.json(reqDoc.toObject());
 });
 
@@ -205,7 +209,7 @@ const requestChanges = asyncHandler(async (req, res) => {
   const revId = await nextSeqId(Revision, 'id', 'REV-', 3);
   await Revision.create({ id: revId, requestId: reqDoc.id, project: reqDoc.projectName, revNumber: 'R' + (count + 1), designer: reqDoc.assignedDesigner, requestedBy: (req.auth && req.auth.name) || 'Design Head', status: 'Pending', comments: remarks, date: new Date().toISOString().slice(0, 10) });
   await Notification.create({ audience: 'team', type: 'revision', title: 'Changes requested', desc: `${reqDoc.projectName || reqDoc.id}: ${remarks}`, time: 'just now', designerName: reqDoc.assignedDesigner, requestId: reqDoc.id, projectName: reqDoc.projectName || '', projectCode: reqDoc.procurementProjectCode || '' });
-  if (reqDoc.source === 'procurement') await Notification.create({ audience: 'procurement', type: 'revision', title: 'Changes requested', desc: `${reqDoc.projectName || reqDoc.id}: ${remarks}`, time: 'just now' });
+  if (EXTERNAL_SOURCES.includes(reqDoc.source)) await Notification.create({ audience: reqDoc.source, type: 'revision', title: 'Changes requested', desc: `${reqDoc.projectName || reqDoc.id}: ${remarks}`, time: 'just now', requestId: reqDoc.id, projectName: reqDoc.projectName || '', projectCode: reqDoc.procurementProjectCode || '' });
   res.json(reqDoc.toObject());
 });
 

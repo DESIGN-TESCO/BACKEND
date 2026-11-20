@@ -6,7 +6,7 @@ const mongoose = require('mongoose');
 // `type` by the Team UI (revision|assignment|approval).
 const NotificationSchema = new mongoose.Schema(
   {
-    audience: { type: String, enum: ['head', 'team', 'procurement'], required: true, index: true },
+    audience: { type: String, enum: ['head', 'team', 'procurement', 'sales', 'execution'], required: true, index: true },
     title: { type: String, default: '' },
     message: { type: String, default: '' },  // Head uses `message`; Team uses `desc`
     desc: { type: String, default: '' },
